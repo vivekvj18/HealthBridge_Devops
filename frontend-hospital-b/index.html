@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Content Security Policy (CSP) -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:*;" />
+
+    <!-- SEO Meta Tags -->
+    <title>Metro Medical Center — Doctor Portal</title>
+    <meta name="description" content="Metro Medical Center Doctor Portal, powered by health-bridge for secure FHIR R4 interoperability." />
+    <meta name="keywords" content="Metro Medical Center, hospital, FHIR, interoperability" />
+    <meta name="author" content="health-bridge" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Metro Medical Center — Doctor Portal" />
+    <meta property="og:description" content="Metro Medical Center Doctor Portal." />
+    <meta property="og:type" content="website" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚕️</text></svg>" />
+
+    <!-- Preconnect for Google Fonts (loaded via CSS @import) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
