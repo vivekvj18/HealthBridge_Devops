@@ -1,6 +1,6 @@
-# Phase 5: Platform Database Separation
+# Platform Database Separation
 
-Phase 5 formalizes the database-per-service ownership for shared platform data.
+This document defines database-per-service ownership for shared platform data.
 
 ## Target databases
 
@@ -29,7 +29,7 @@ The default local values are stored in each service's `application.properties`.
 Run:
 
 ```bash
-psql postgres -f db/phase-5/create-platform-databases.sql
+psql postgres -f db/create-platform-databases.sql
 ```
 
 The script is rerunnable and creates:
@@ -38,41 +38,24 @@ The script is rerunnable and creates:
 - `consent_db`
 - `notification_audit_db`
 
-## Move existing local data
+## Fresh application startup
 
-If a developer already has data in the old monolith `fhir_main` database, export it first:
+This project is treated as a fresh microservices application. Do not migrate data from the old monolith `fhir_main` database.
 
-```bash
-scripts/phase-5/export-platform-data.sh
-```
-
-Start each extracted platform service once so Hibernate can create/update its target tables, then import:
-
-```bash
-scripts/phase-5/import-platform-data.sh
-```
-
-The scripts use these defaults:
-
-- source: `postgresql://fhir_user:fhir_pass@localhost:5432/fhir_main`
-- auth target: `postgresql://fhir_user:fhir_pass@localhost:5432/auth_identity_db`
-- consent target: `postgresql://fhir_user:fhir_pass@localhost:5432/consent_db`
-- notification/audit target: `postgresql://fhir_user:fhir_pass@localhost:5432/notification_audit_db`
-
-Override the corresponding environment variables when needed.
+After creating the empty databases, start the extracted services and let Hibernate create/update the service-owned tables with `JPA_DDL_AUTO=update` for local development. Production deployments should replace this with explicit migration tooling.
 
 ## Verify
 
 Check config markers:
 
 ```bash
-scripts/phase-5/verify-platform-db-config.sh
+scripts/verify-platform-db-config.sh
 ```
 
 Check tables after services have started:
 
 ```bash
-psql postgres -f db/phase-5/platform-table-ownership.sql
+psql postgres -f db/platform-table-ownership.sql
 ```
 
 Compile and test:

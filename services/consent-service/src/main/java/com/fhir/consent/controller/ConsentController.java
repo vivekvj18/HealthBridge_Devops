@@ -42,6 +42,11 @@ public class ConsentController {
         return consentStore.getPendingRequests(patientId);
     }
 
+    @GetMapping("/{requestId}")
+    public ConsentRequestViewDTO getRequest(@PathVariable Long requestId) {
+        return consentStore.getRequest(requestId);
+    }
+
     // ── Respond to request (Patient) ─────────────────────────────────────────
 
     @PostMapping("/respond/{requestId}")

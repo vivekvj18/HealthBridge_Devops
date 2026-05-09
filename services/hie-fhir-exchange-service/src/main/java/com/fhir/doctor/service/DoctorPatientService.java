@@ -8,12 +8,20 @@ import com.fhir.hospitalA.model.HospitalAPatient;
 import com.fhir.hospitalA.repository.HospitalAPatientRepository;
 import com.fhir.hospitalB.model.HospitalBPatient;
 import com.fhir.hospitalB.repository.HospitalBPatientRepository;
+import com.fhir.identity.dto.RegisterPatientDTO;
 import com.fhir.identity.service.IdentityService;
 import com.fhir.shared.security.SecurityContextHelper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
@@ -43,6 +51,9 @@ public class DoctorPatientService {
 
     @Autowired
     private IdentityService identityService;
+
+    @Value("${auth.identity.base-url:http://localhost:8081}")
+    private String authIdentityBaseUrl;
 
     @Transactional(readOnly = true)
     public DoctorPatientLookupResponseDTO lookupPatient(String identifier) {
@@ -84,6 +95,9 @@ public class DoctorPatientService {
         }
 
         AppUser user = authService.findByAbhaId(abhaId);
+        if (user == null) {
+            user = fetchAndRegisterPatientFromAuthIdentity(abhaId);
+        }
         if (user == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Patient with ABHA-ID not found");
         }
@@ -136,6 +150,65 @@ public class DoctorPatientService {
         }
 
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported hospital: " + hospitalId);
+    }
+
+    private AppUser fetchAndRegisterPatientFromAuthIdentity(String abhaId) {
+        Map<String, Object> patient = fetchPatientFromAuthIdentity(abhaId);
+        if (patient == null || patient.isEmpty()) {
+            return null;
+        }
+
+        RegisterPatientDTO dto = new RegisterPatientDTO();
+        dto.setAbhaId(value(patient, "abhaId"));
+        dto.setName(value(patient, "fullName"));
+        dto.setEmail(value(patient, "email"));
+        dto.setPhone(value(patient, "phone"));
+        dto.setGender(value(patient, "gender"));
+        dto.setDateOfBirth(value(patient, "dateOfBirth"));
+        dto.setBloodGroup(value(patient, "bloodGroup"));
+        identityService.register(dto);
+
+        AppUser user = new AppUser();
+        user.setAbhaId(dto.getAbhaId());
+        user.setUsername(value(patient, "username"));
+        user.setRole(UserRole.PATIENT);
+        user.setFullName(dto.getName());
+        user.setEmail(dto.getEmail());
+        user.setPhone(dto.getPhone());
+        user.setGender(dto.getGender());
+        user.setDateOfBirth(dto.getDateOfBirth());
+        user.setBloodGroup(dto.getBloodGroup());
+        return user;
+    }
+
+    private Map<String, Object> fetchPatientFromAuthIdentity(String abhaId) {
+        try {
+            String authorization = currentAuthorizationHeader();
+            return RestClient.create(authIdentityBaseUrl)
+                    .get()
+                    .uri("/auth/register/patient/{abhaId}", abhaId)
+                    .headers(headers -> {
+                        if (authorization != null) {
+                            headers.set(HttpHeaders.AUTHORIZATION, authorization);
+                        }
+                    })
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {});
+        } catch (RestClientException ex) {
+            return null;
+        }
+    }
+
+    private String currentAuthorizationHeader() {
+        if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes) {
+            return attributes.getRequest().getHeader(HttpHeaders.AUTHORIZATION);
+        }
+        return null;
+    }
+
+    private String value(Map<String, Object> values, String key) {
+        Object value = values.get(key);
+        return value != null ? value.toString() : null;
     }
 
     private String generateLocalPatientId(String hospitalId) {

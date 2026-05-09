@@ -21,7 +21,8 @@ import org.springframework.transaction.PlatformTransactionManager;
                 "com.fhir.hospitalA.repository",
                 "com.fhir.consent.repository",
                 "com.fhir.notification",
-                "com.fhir.shared.audit"
+                "com.fhir.shared.audit",
+                "com.fhir.shared.hospital"
         },
         entityManagerFactoryRef = "entityManagerFactory",
         transactionManagerRef = "transactionManager")
@@ -51,7 +52,8 @@ public class HospitalAServiceJpaConfig {
                         "com.fhir.hospitalA.model",
                         "com.fhir.consent.model",
                         "com.fhir.notification",
-                        "com.fhir.shared.audit")
+                        "com.fhir.shared.audit",
+                        "com.fhir.shared.hospital")
                 .properties(Map.of(
                         "hibernate.hbm2ddl.auto", ddlAuto,
                         "hibernate.dialect", dialect))

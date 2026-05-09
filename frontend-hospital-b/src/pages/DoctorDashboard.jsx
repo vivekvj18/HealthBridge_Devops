@@ -767,7 +767,10 @@ const DoctorDashboard = () => {
                   <form onSubmit={async (e) => {
                     e.preventDefault();
                     setLinkLoading(true);
-                    try { const res = await doctorService.getPatientByAbhaId(abhaIdInput); setPatientDetails(res); }
+                    setCreatePatientError('');
+                    setCreatePatientResult(null);
+                    setPatientDetails(null);
+                    try { const res = await doctorService.getPatientByAbhaId(abhaIdInput); setPatientDetails(res); setCreatePatientError(''); }
                     catch (err) { setCreatePatientError(err.message); }
                     finally { setLinkLoading(false); }
                   }}>
@@ -780,7 +783,9 @@ const DoctorDashboard = () => {
                       <PatientDetailsGrid details={patientDetails} />
                       <button className="btn-primary" onClick={async () => {
                         setLinkLoading(true);
-                        try { const res = await doctorService.linkPatientByAbhaId(abhaIdInput); setCreatePatientResult(res); setPatientDetails(null); }
+                        setCreatePatientError('');
+                        setCreatePatientResult(null);
+                        try { const res = await doctorService.linkPatientByAbhaId(abhaIdInput); setCreatePatientResult(res); setPatientDetails(null); setCreatePatientError(''); }
                         catch (err) { setCreatePatientError(err.message); }
                         finally { setLinkLoading(false); }
                       }}>Link Patient</button>

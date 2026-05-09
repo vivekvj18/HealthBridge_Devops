@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 check_property() {
   local file="$1"
@@ -18,4 +18,4 @@ check_property "$ROOT_DIR/services/consent-service/src/main/resources/applicatio
 check_property "$ROOT_DIR/services/notification-audit-service/src/main/resources/application.properties" "notification_audit_db"
 check_property "$ROOT_DIR/services/admin-reporting-service/src/main/resources/application.properties" "notification_audit_db"
 
-printf 'Phase 5 platform database configuration looks separated.\n'
+printf 'Platform database configuration looks separated.\n'

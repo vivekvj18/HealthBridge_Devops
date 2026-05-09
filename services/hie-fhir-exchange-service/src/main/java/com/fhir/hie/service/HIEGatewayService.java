@@ -2,10 +2,7 @@ package com.fhir.hie.service;
 
 import com.fhir.consent.dto.ConsentRequestViewDTO;
 import com.fhir.consent.dto.InitiateConsentDTO;
-import com.fhir.consent.model.ConsentRequestEntity;
 import com.fhir.consent.model.ConsentStatus;
-import com.fhir.consent.repository.ConsentRequestRepository;
-import com.fhir.consent.service.ConsentStore;
 import com.fhir.hie.client.HIPFhirClient;
 import com.fhir.hie.dto.ExchangeRequestDTO;
 import com.fhir.hie.dto.ExchangeResponseDTO;
@@ -16,10 +13,17 @@ import com.fhir.notification.NotificationService;
 import com.fhir.shared.audit.AuditService;
 import com.fhir.shared.security.SecurityContextHelper;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.time.Instant;
@@ -28,14 +32,15 @@ import java.time.Instant;
 public class HIEGatewayService {
 
     @Autowired private IdentityService identityService;
-    @Autowired private ConsentStore consentStore;
-    @Autowired private ConsentRequestRepository consentRequestRepository;
     @Autowired private NotificationService notificationService;
     @Autowired private HIPFhirClient hipFhirClient;
     @Autowired private AuditService auditService;
     @Autowired private SecurityContextHelper securityContextHelper;
     @Autowired private HospitalAOPConsultRepository hospitalAOPConsultRepository;
     @Autowired private HospitalBOPConsultRepository hospitalBOPConsultRepository;
+
+    @Value("${consent.service.base-url:http://localhost:8082}")
+    private String consentServiceBaseUrl;
 
     public ExchangeResponseDTO orchestrateExchange(ExchangeRequestDTO request) {
         String requesterId = securityContextHelper.getCurrentUsername();
@@ -49,14 +54,15 @@ public class HIEGatewayService {
                 .build();
         }
 
-        // Step 2: Check for existing active GRANTED consent
-        Set<String> grantedTypes = consentStore.getActiveGrantedDataTypes(
+        // Step 2: Check for existing active GRANTED consent in the consent service
+        ConsentRequestViewDTO latestConsent = latestActiveGrantedConsent(
             request.getPatientId(), requesterId);
+        Set<String> grantedTypes = grantedTypes(latestConsent);
 
         if (!grantedTypes.isEmpty()) {
             try {
                 // Consent exists — try to pull data
-                return pullAndReturn(request, requesterId, grantedTypes);
+                return pullAndReturn(request, requesterId, latestConsent);
             } catch (Exception e) {
                 // If pull fails (e.g. token expired/invalid), fallback to initiating a new request
                 System.out.println("⚠️ Existing consent failed (likely expired). Initiating fresh request. Error: " + e.getMessage());
@@ -77,8 +83,7 @@ public class HIEGatewayService {
             : "HIE Data Exchange requested by " + request.getHiu());
         initiateDTO.setRequestedDataTypes(request.getScope());
 
-        ConsentRequestViewDTO consent = consentStore.initiateRequest(
-            initiateDTO, requesterId);
+        ConsentRequestViewDTO consent = initiateConsentInConsentService(initiateDTO);
 
         // Step 4: Notify patient
         notificationService.notifyPatientConsentRequest(
@@ -94,9 +99,7 @@ public class HIEGatewayService {
     }
 
     public ExchangeResponseDTO checkExchangeStatus(Long consentId) {
-        ConsentRequestEntity consent = consentRequestRepository.findById(consentId)
-            .orElseThrow(() -> new ResponseStatusException(
-                HttpStatus.NOT_FOUND, "Consent request not found: " + consentId));
+        ConsentRequestViewDTO consent = getConsentFromConsentService(consentId);
 
         if (consent.getStatus() == ConsentStatus.GRANTED) {
             ExchangeRequestDTO req = new ExchangeRequestDTO();
@@ -105,8 +108,7 @@ public class HIEGatewayService {
             req.setHiu(resolveHiuForCurrentRequester());
             req.setScope(consent.getGrantedDataTypes());
 
-            return pullAndReturn(req, consent.getRequesterId(),
-                consent.getGrantedDataTypes());
+            return pullAndReturn(req, consent.getRequesterId(), consent);
         }
 
         if (consent.getStatus() == ConsentStatus.DENIED ||
@@ -129,7 +131,6 @@ public class HIEGatewayService {
      * Phase 1: Explicitly request consent from patient.
      */
     public ExchangeResponseDTO initiateConsentOnly(ExchangeRequestDTO request) {
-        String requesterId = securityContextHelper.getCurrentUsername();
         request.setHip(resolveHipForPatient(request.getPatientId(), request.getHip()));
         if (request.getHiu() == null || request.getHiu().isBlank()) {
             request.setHiu(resolveHiuForCurrentRequester());
@@ -142,7 +143,7 @@ public class HIEGatewayService {
         initiateDTO.setPurpose(request.getPurpose() != null ? request.getPurpose() : "Manual HIE Consent Request");
         initiateDTO.setRequestedDataTypes(request.getScope());
 
-        ConsentRequestViewDTO consent = consentStore.initiateRequest(initiateDTO, requesterId);
+        ConsentRequestViewDTO consent = initiateConsentInConsentService(initiateDTO);
         notificationService.notifyPatientConsentRequest(request.getPatientId(), consent.getId());
 
         return ExchangeResponseDTO.builder()
@@ -158,8 +159,8 @@ public class HIEGatewayService {
     public ExchangeResponseDTO pullClinicalData(ExchangeRequestDTO request) {
         String requesterId = securityContextHelper.getCurrentUsername();
 
-        Set<String> grantedTypes = consentStore.getActiveGrantedDataTypes(request.getPatientId(), requesterId);
-        if (grantedTypes.isEmpty()) {
+        ConsentRequestViewDTO latestConsent = latestActiveGrantedConsent(request.getPatientId(), requesterId);
+        if (latestConsent == null || grantedTypes(latestConsent).isEmpty()) {
             return ExchangeResponseDTO.builder()
                 .status("NO_CONSENT")
                 .message("No active consent found. Please request consent first.")
@@ -168,25 +169,18 @@ public class HIEGatewayService {
 
         request.setHip(resolveHipForPatient(request.getPatientId(), request.getHip()));
         request.setHiu(resolveHiuForCurrentRequester());
-        return pullAndReturn(request, requesterId, grantedTypes);
+        return pullAndReturn(request, requesterId, latestConsent);
     }
 
     private ExchangeResponseDTO pullAndReturn(
             ExchangeRequestDTO request,
             String requesterId,
-            Set<String> grantedTypes) {
+            ConsentRequestViewDTO latestConsent) {
 
         request.setHip(resolveHipForPatient(request.getPatientId(), request.getHip()));
         if (request.getHiu() == null || request.getHiu().isBlank()) {
             request.setHiu(resolveHiuForCurrentRequester());
         }
-
-        // Fetch the consent token from the latest GRANTED consent
-        // Fetch the latest GRANTED consent (highest ID)
-        ConsentRequestEntity latestConsent = consentRequestRepository
-            .findFirstByPatientIdAndRequesterIdAndStatusOrderByIdDesc(
-                request.getPatientId(), requesterId, ConsentStatus.GRANTED)
-            .orElse(null);
 
         if (latestConsent == null) {
             return ExchangeResponseDTO.builder()
@@ -210,8 +204,8 @@ public class HIEGatewayService {
                 .build();
         }
 
-        // Use strictly the scopes granted in the latest consent, overriding any historical merge
-        Set<String> strictGrantedTypes = latestConsent.getGrantedDataTypes();
+        // Use strictly the scopes granted in this consent, avoiding historical merges.
+        Set<String> strictGrantedTypes = grantedTypes(latestConsent);
         String consentToken = latestConsent.getConsentToken();
 
         Long auditId = auditService.logPending(
@@ -244,6 +238,85 @@ public class HIEGatewayService {
             auditService.markFailed(auditId, e.getMessage());
             throw e;
         }
+    }
+
+    private ConsentRequestViewDTO initiateConsentInConsentService(InitiateConsentDTO dto) {
+        try {
+            String authorization = currentAuthorizationHeader();
+            return consentClient()
+                .post()
+                .uri("/consent/initiate")
+                .headers(headers -> setAuthorization(headers, authorization))
+                .body(dto)
+                .retrieve()
+                .body(ConsentRequestViewDTO.class);
+        } catch (RestClientException ex) {
+            throw new IllegalStateException("Unable to create consent request in consent-service: " + ex.getMessage(), ex);
+        }
+    }
+
+    private ConsentRequestViewDTO getConsentFromConsentService(Long consentId) {
+        try {
+            String authorization = currentAuthorizationHeader();
+            return consentClient()
+                .get()
+                .uri("/consent/{requestId}", consentId)
+                .headers(headers -> setAuthorization(headers, authorization))
+                .retrieve()
+                .body(ConsentRequestViewDTO.class);
+        } catch (RestClientException ex) {
+            throw new IllegalStateException("Unable to read consent request from consent-service: " + ex.getMessage(), ex);
+        }
+    }
+
+    private List<ConsentRequestViewDTO> getPatientConsentsFromConsentService(String patientId) {
+        try {
+            String authorization = currentAuthorizationHeader();
+            List<ConsentRequestViewDTO> consents = consentClient()
+                .get()
+                .uri("/consent/pending/{patientId}", patientId)
+                .headers(headers -> setAuthorization(headers, authorization))
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {});
+            return consents != null ? consents : List.of();
+        } catch (RestClientException ex) {
+            throw new IllegalStateException("Unable to list patient consents from consent-service: " + ex.getMessage(), ex);
+        }
+    }
+
+    private ConsentRequestViewDTO latestActiveGrantedConsent(String patientId, String requesterId) {
+        Instant now = Instant.now();
+        return getPatientConsentsFromConsentService(patientId).stream()
+            .filter(consent -> requesterId.equals(consent.getRequesterId()))
+            .filter(consent -> consent.getStatus() == ConsentStatus.GRANTED)
+            .filter(consent -> consent.getRevokedAt() == null)
+            .filter(consent -> consent.getExpiresAt() == null || consent.getExpiresAt().isAfter(now))
+            .max(Comparator.comparing(ConsentRequestViewDTO::getId))
+            .orElse(null);
+    }
+
+    private Set<String> grantedTypes(ConsentRequestViewDTO consent) {
+        if (consent == null || consent.getGrantedDataTypes() == null) {
+            return Set.of();
+        }
+        return new HashSet<>(consent.getGrantedDataTypes());
+    }
+
+    private RestClient consentClient() {
+        return RestClient.create(consentServiceBaseUrl);
+    }
+
+    private void setAuthorization(HttpHeaders headers, String authorization) {
+        if (authorization != null && !authorization.isBlank()) {
+            headers.set(HttpHeaders.AUTHORIZATION, authorization);
+        }
+    }
+
+    private String currentAuthorizationHeader() {
+        if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes) {
+            return attributes.getRequest().getHeader(HttpHeaders.AUTHORIZATION);
+        }
+        return null;
     }
 
     private String resolveHipForCurrentRequester() {

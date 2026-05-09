@@ -68,6 +68,13 @@ public class ConsentStore {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public ConsentRequestViewDTO getRequest(Long requestId) {
+        return requestRepository.findById(requestId)
+                .map(this::mapToDTO)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Request not found"));
+    }
+
     @Transactional
     public ConsentRequestViewDTO processDecision(Long requestId, String patientId, ConsentDecisionDTO dto) {
         ConsentRequestEntity request = requestRepository.findById(requestId)

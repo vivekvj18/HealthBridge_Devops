@@ -65,11 +65,15 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/health", "/actuator/health/**",
                                  "/actuator/info", "/internal/**").permitAll()
 
-                // ── Consent endpoints — ADMIN or PATIENT only ───────────────
+                // ── Consent endpoints ──────────────────────────────────────
+                .requestMatchers(HttpMethod.POST, "/consent/initiate")
+                    .hasAnyRole("ADMIN", "DOCTOR")
                 .requestMatchers(HttpMethod.POST, "/consent/**")
                     .hasAnyRole("ADMIN", "PATIENT")
                 .requestMatchers(HttpMethod.GET, "/consent/pending/**")
-                    .hasAnyRole("ADMIN", "PATIENT")
+                    .hasAnyRole("ADMIN", "PATIENT", "DOCTOR")
+                .requestMatchers(HttpMethod.GET, "/consent/**")
+                    .hasAnyRole("ADMIN", "PATIENT", "DOCTOR")
 
                 // ── Hospital A endpoints ─────────────────────────────────────
                 // Patient push must be listed before the wildcard rule.

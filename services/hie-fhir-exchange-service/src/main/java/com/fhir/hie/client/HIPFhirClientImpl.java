@@ -1,32 +1,61 @@
 package com.fhir.hie.client;
 
-import com.fhir.hospitalA.service.HospitalAService;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Set;
 
 /**
- * MVP implementation: direct in-JVM call to HospitalAService.
- * In production this becomes a REST call to Hospital A's FHIR endpoint.
- * The interface stays identical — swap only this class.
+ * HIP client used by the HIE service to pull from the real hospital services.
  */
 @Component
 public class HIPFhirClientImpl implements HIPFhirClient {
 
-    @Autowired
-    private HospitalAService hospitalAService;
+    @Value("${hospital-a.service.base-url:http://localhost:8083}")
+    private String hospitalAServiceBaseUrl;
 
-    @Autowired
-    private com.fhir.hospitalB.service.HospitalBService hospitalBService;
+    @Value("${hospital-b.service.base-url:http://localhost:8084}")
+    private String hospitalBServiceBaseUrl;
 
     public String pullBundle(String hip, String patientId, String consentToken, Set<String> scope) {
         if ("HospitalA".equalsIgnoreCase(hip)) {
-            return hospitalAService.pullFhirBundle(patientId, consentToken, scope);
-        } else if ("HospitalB".equalsIgnoreCase(hip)) {
-            return hospitalBService.pullFhirBundle(patientId, consentToken, scope);
-        } else {
-            throw new IllegalArgumentException("Unknown HIP: " + hip);
+            return pullFromHospital(hospitalAServiceBaseUrl, "/internal/hospitalA/fhir-bundle", patientId, consentToken, scope);
         }
+        if ("HospitalB".equalsIgnoreCase(hip)) {
+            return pullFromHospital(hospitalBServiceBaseUrl, "/internal/hospitalB/fhir-bundle", patientId, consentToken, scope);
+        }
+        throw new IllegalArgumentException("Unknown HIP: " + hip);
+    }
+
+    private String pullFromHospital(
+            String baseUrl,
+            String path,
+            String patientId,
+            String consentToken,
+            Set<String> scope) {
+        try {
+            return RestClient.create(baseUrl)
+                    .post()
+                    .uri(path)
+                    .body(new PullBundleRequest(patientId, consentToken, scope))
+                    .retrieve()
+                    .body(String.class);
+        } catch (RestClientResponseException ex) {
+            throw new ResponseStatusException(ex.getStatusCode(), extractErrorMessage(ex), ex);
+        } catch (RestClientException ex) {
+            throw new IllegalStateException("Unable to pull FHIR bundle from hospital service: " + ex.getMessage(), ex);
+        }
+    }
+
+    private String extractErrorMessage(RestClientResponseException ex) {
+        String body = ex.getResponseBodyAsString();
+        return body != null && !body.isBlank() ? body : ex.getMessage();
+    }
+
+    private record PullBundleRequest(String patientId, String consentToken, Set<String> scope) {
     }
 }

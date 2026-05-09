@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import { patientService } from '../services/patientService.js';
@@ -72,26 +72,44 @@ const PatientDashboard = () => {
     }
   }, [pushForm.targetHospitalId]);
 
-  useEffect(() => {
-    if (!patientId) { setLoading(false); return; }
-    
-    // Fetch consents and consults
-    Promise.all([
-      patientService.getConsents(patientId),
-      patientService.getConsultations(patientId)
-    ])
-      .then(([consentData, consultData]) => {
-        setConsents(consentData);
-        setConsults(consultData);
-        const init = {};
-        consentData.forEach((c) => {
-          init[c.id] = c.grantedDataTypes?.length ? c.grantedDataTypes : (c.requestedDataTypes?.length ? c.requestedDataTypes : ['OP_CONSULT']);
-        });
-        setGrantedTypes(init);
-      })
-      .catch((e) => console.error(e))
-      .finally(() => setLoading(false));
+  const loadPatientData = useCallback(async ({ showSpinner = false } = {}) => {
+    if (!patientId) {
+      setLoading(false);
+      return;
+    }
+
+    if (showSpinner) setLoading(true);
+
+    try {
+      const [consentData, consultData] = await Promise.all([
+        patientService.getConsents(patientId),
+        patientService.getConsultations(patientId)
+      ]);
+
+      setConsents(consentData);
+      setConsults(consultData);
+      const init = {};
+      consentData.forEach((c) => {
+        init[c.id] = c.grantedDataTypes?.length ? c.grantedDataTypes : (c.requestedDataTypes?.length ? c.requestedDataTypes : ['OP_CONSULT']);
+      });
+      setGrantedTypes(init);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      if (showSpinner) setLoading(false);
+    }
   }, [patientId]);
+
+  useEffect(() => {
+    if (!patientId) {
+      setLoading(false);
+      return undefined;
+    }
+
+    loadPatientData({ showSpinner: true });
+    const refreshId = window.setInterval(() => loadPatientData(), 5000);
+    return () => window.clearInterval(refreshId);
+  }, [patientId, loadPatientData]);
 
   const handleRespond = async (consent, grant) => {
     setConsentLoading((p) => ({ ...p, [consent.id]: true }));
