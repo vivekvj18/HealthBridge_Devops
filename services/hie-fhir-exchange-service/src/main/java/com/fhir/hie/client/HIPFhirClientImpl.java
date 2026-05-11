@@ -15,10 +15,10 @@ import java.util.Set;
 @Component
 public class HIPFhirClientImpl implements HIPFhirClient {
 
-    @Value("${hospital-a.service.base-url:http://localhost:8083}")
+    @Value("${hospital-a.service.base-url:http://localhost:9097}")
     private String hospitalAServiceBaseUrl;
 
-    @Value("${hospital-b.service.base-url:http://localhost:8084}")
+    @Value("${hospital-b.service.base-url:http://localhost:9098}")
     private String hospitalBServiceBaseUrl;
 
     public String pullBundle(String hip, String patientId, String consentToken, Set<String> scope) {

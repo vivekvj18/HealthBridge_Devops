@@ -52,7 +52,7 @@ public class DoctorPatientService {
     @Autowired
     private IdentityService identityService;
 
-    @Value("${auth.identity.base-url:http://localhost:8081}")
+    @Value("${auth.identity.base-url:http://localhost:9092}")
     private String authIdentityBaseUrl;
 
     @Transactional(readOnly = true)

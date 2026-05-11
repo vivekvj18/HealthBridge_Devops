@@ -39,7 +39,7 @@ public class HIEGatewayService {
     @Autowired private HospitalAOPConsultRepository hospitalAOPConsultRepository;
     @Autowired private HospitalBOPConsultRepository hospitalBOPConsultRepository;
 
-    @Value("${consent.service.base-url:http://localhost:8082}")
+    @Value("${consent.service.base-url:http://localhost:9094}")
     private String consentServiceBaseUrl;
 
     public ExchangeResponseDTO orchestrateExchange(ExchangeRequestDTO request) {
