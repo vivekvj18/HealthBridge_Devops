@@ -5,7 +5,7 @@ pipeline {
         stage('Check Tools') {
             steps {
                 sh 'mvn --version'
-                sh 'docker --version' // Ye bhi check kar lete hain
+                sh 'docker --version'
             }
         }
         stage('Build Project') {
@@ -13,10 +13,28 @@ pipeline {
                 sh 'mvn clean install'
             }
         }
-        stage('Build Docker Image') {
+        stage('Build All Docker Images') {
             steps {
-                // Auth service ke folder me ja kar image build karo
-                sh 'cd services/auth-identity-service && docker build -t auth-service:latest .'
+                script {
+                    // 1. Saari services ki ek list banayi
+                    def services = [
+                        'discovery-server',
+                        'api-gateway-service',
+                        'auth-identity-service',
+                        'consent-service',
+                        'hie-fhir-exchange-service',
+                        'hospital-a-service',
+                        'hospital-b-service',
+                        'notification-audit-service',
+                        'admin-reporting-service'
+                    ]
+                    
+                    // 2. Loop chalaya har ek service ke liye
+                    for (service in services) {
+                        echo "Building image for: ${service}"
+                        sh "cd services/${service} && docker build -t healthbridge-${service}:latest ."
+                    }
+                }
             }
         }
     }
