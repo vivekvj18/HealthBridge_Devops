@@ -13,10 +13,9 @@ pipeline {
                 sh 'mvn clean install'
             }
         }
-        stage('Build All Docker Images') {
+        stage('Build Docker Images (Selective)') {
             steps {
                 script {
-                    // 1. Saari services ki ek list banayi
                     def services = [
                         'discovery-server',
                         'api-gateway-service',
@@ -29,10 +28,29 @@ pipeline {
                         'admin-reporting-service'
                     ]
                     
-                    // 2. Loop chalaya har ek service ke liye
+                    // 1. Pata karo ki kaun si files change hui hain
+                    def changedFiles = []
+                    try {
+                        def diffOutput = sh(script: "git diff --name-only HEAD~1 HEAD", returnStdout: true).trim()
+                        changedFiles = diffOutput.split('\n')
+                        echo "Changed files in this commit: ${changedFiles}"
+                    } catch (e) {
+                        echo "Could not get git diff. Building all services as fallback."
+                        // Agar diff fail ho jaye (jaise pehla build), to sabko build kar do
+                        changedFiles = services.collect { "services/${it}/dummy" }
+                    }
+                    
+                    // 2. Loop chalao aur check karo
                     for (service in services) {
-                        echo "Building image for: ${service}"
-                        sh "cd services/${service} && docker build -t healthbridge-${service}:latest ."
+                        // Check karo ki kya koi changed file is service ke folder me hai
+                        def serviceChanged = changedFiles.any { it.startsWith("services/${service}/") }
+                        
+                        if (serviceChanged) {
+                            echo ">>> Service ${service} has changes. Building image..."
+                            sh "cd services/${service} && docker build -t healthbridge-${service}:latest ."
+                        } else {
+                            echo "--- Service ${service} has no changes. Skipping."
+                        }
                     }
                 }
             }
