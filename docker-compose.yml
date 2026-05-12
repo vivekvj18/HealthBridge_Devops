@@ -1,0 +1,163 @@
+version: '3.8'
+
+services:
+  # 1. The Discovery Server (Eureka)
+  discovery-server:
+    image: health-bridge/discovery-server:1.0
+    container_name: hb-discovery-server
+    ports:
+      - "9095:9095"
+    networks:
+      - health-bridge-network
+
+  # 2. PostgreSQL Database (Shared instance for all Postgres DBs)
+  postgres-db:
+    image: postgres:15-alpine
+    container_name: hb-postgres
+    environment:
+      POSTGRES_USER: fhir_user
+      POSTGRES_PASSWORD: fhir_pass
+      POSTGRES_DB: notification_audit_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - health-bridge-network
+
+  # 3. MongoDB Database (Hospital B)
+  mongodb:
+    image: mongo:6.0
+    container_name: hb-mongodb
+    ports:
+      - "27017:27017"
+    networks:
+      - health-bridge-network
+
+  # 4. API Gateway
+  api-gateway:
+    image: health-bridge/api-gateway-service:1.0
+    container_name: hb-api-gateway
+    ports:
+      - "9091:9091"
+    depends_on:
+      - discovery-server
+      - postgres-db
+      - mongodb
+    environment:
+      EUREKA_SERVER_URL: "http://discovery-server:9095/eureka/"
+    networks:
+      - health-bridge-network
+
+  # 5. Auth Identity Service
+  auth-service:
+    image: health-bridge/auth-identity-service:1.0
+    container_name: hb-auth-service
+    ports:
+      - "9092:9092"
+    depends_on:
+      - discovery-server
+      - postgres-db
+    environment:
+      EUREKA_SERVER_URL: "http://discovery-server:9095/eureka/"
+      AUTH_IDENTITY_DB_URL: "jdbc:postgresql://postgres-db:5432/auth_identity_db"
+    networks:
+      - health-bridge-network
+
+  # 6. Consent Service
+  consent-service:
+    image: health-bridge/consent-service:1.0
+    container_name: hb-consent-service
+    ports:
+      - "9094:9094"
+    depends_on:
+      - discovery-server
+      - postgres-db
+    environment:
+      EUREKA_SERVER_URL: "http://discovery-server:9095/eureka/"
+      CONSENT_DB_URL: "jdbc:postgresql://postgres-db:5432/consent_db"
+    networks:
+      - health-bridge-network
+
+  # 7. HIE FHIR Exchange Service
+  hie-fhir-service:
+    image: health-bridge/hie-fhir-exchange-service:1.0
+    container_name: hb-hie-fhir-service
+    ports:
+      - "9096:9096"
+    depends_on:
+      - discovery-server
+      - postgres-db
+      - mongodb
+    environment:
+      EUREKA_SERVER_URL: "http://discovery-server:9095/eureka/"
+      HIE_SUPPORT_DB_URL: "jdbc:postgresql://postgres-db:5432/fhir_main"
+      HOSPITAL_B_MONGO_URI: "mongodb://mongodb:27017"
+    networks:
+      - health-bridge-network
+
+  # 8. Hospital A Service
+  hospital-a-service:
+    image: health-bridge/hospital-a-service:1.0
+    container_name: hb-hospital-a-service
+    ports:
+      - "9097:9097"
+    depends_on:
+      - discovery-server
+      - postgres-db
+    environment:
+      EUREKA_SERVER_URL: "http://discovery-server:9095/eureka/"
+      HOSPITAL_A_DB_URL: "jdbc:postgresql://postgres-db:5432/notification_audit_db"
+    networks:
+      - health-bridge-network
+
+  # 9. Hospital B Service
+  hospital-b-service:
+    image: health-bridge/hospital-b-service:1.0
+    container_name: hb-hospital-b-service
+    ports:
+      - "9098:9098"
+    depends_on:
+      - discovery-server
+      - postgres-db
+      - mongodb
+    environment:
+      EUREKA_SERVER_URL: "http://discovery-server:9095/eureka/"
+      HOSPITAL_B_SUPPORT_DB_URL: "jdbc:postgresql://postgres-db:5432/notification_audit_db"
+      HOSPITAL_B_MONGO_URI: "mongodb://mongodb:27017"
+    networks:
+      - health-bridge-network
+
+  # 10. Notification Audit Service
+  notification-service:
+    image: health-bridge/notification-audit-service:1.0
+    container_name: hb-notification-service
+    ports:
+      - "9099:9099"
+    depends_on:
+      - discovery-server
+      - postgres-db
+    environment:
+      EUREKA_SERVER_URL: "http://discovery-server:9095/eureka/"
+      NOTIFICATION_AUDIT_DB_URL: "jdbc:postgresql://postgres-db:5432/notification_audit_db"
+    networks:
+      - health-bridge-network
+
+  # 11. Admin Reporting Service
+  admin-reporting-service:
+    image: health-bridge/admin-reporting-service:1.0
+    container_name: hb-admin-reporting
+    ports:
+      - "9090:9090"
+    depends_on:
+      - discovery-server
+      - postgres-db
+    environment:
+      EUREKA_SERVER_URL: "http://discovery-server:9095/eureka/"
+      ADMIN_REPORTING_DB_URL: "jdbc:postgresql://postgres-db:5432/notification_audit_db"
+    networks:
+      - health-bridge-network
+
+networks:
+  health-bridge-network:
+    driver: bridge
