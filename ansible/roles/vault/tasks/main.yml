@@ -1,0 +1,40 @@
+---
+- name: Check if Vault is installed
+  command: vault --version
+  register: vault_check
+  ignore_errors: true
+  changed_when: false
+
+- name: Display Vault status
+  debug:
+    msg: "Vault is already installed."
+  when: vault_check.rc == 0
+
+- name: Add HashiCorp GPG key (if not installed)
+  get_url:
+    url: https://apt.releases.hashicorp.com/gpg
+    dest: /tmp/hashicorp.gpg
+  become: true
+  when: vault_check.rc != 0
+
+- name: Import HashiCorp GPG key
+  command: gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg /tmp/hashicorp.gpg
+  args:
+    creates: /usr/share/keyrings/hashicorp-archive-keyring.gpg
+  become: true
+  when: vault_check.rc != 0
+
+- name: Add HashiCorp Repository
+  apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com noble main"
+    state: present
+  become: true
+  when: vault_check.rc != 0
+
+- name: Install Vault
+  apt:
+    name: vault
+    state: present
+    update_cache: yes
+  become: true
+  when: vault_check.rc != 0

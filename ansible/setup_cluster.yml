@@ -1,0 +1,7 @@
+---
+- name: Setup Health-Bridge Infrastructure
+  hosts: localhost
+  connection: local
+  roles:
+    - jenkins
+    - vault

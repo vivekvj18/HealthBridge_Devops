@@ -1,0 +1,13 @@
+---
+- name: Check Docker Installation
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Get Docker version
+      command: docker --version
+      register: docker_version
+      changed_when: false
+
+    - name: Display Docker version
+      debug:
+        msg: "Docker version is {{ docker_version.stdout }}"
