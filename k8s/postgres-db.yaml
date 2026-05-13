@@ -1,0 +1,75 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-script
+data:
+  init-db.sql: |
+    CREATE DATABASE auth_identity_db;
+    CREATE DATABASE fhir_main;
+    CREATE DATABASE consent_db;
+    
+    \c auth_identity_db;
+    CREATE TABLE IF NOT EXISTS hospitals (
+        id VARCHAR(255) PRIMARY KEY,
+        name VARCHAR(255),
+        active BOOLEAN DEFAULT true
+    );
+    INSERT INTO hospitals (id, name, active) VALUES ('HOSP-A', 'City General Hospital', true), ('HOSP-B', 'Metro Medical Center', true) ON CONFLICT (id) DO NOTHING;
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-db
+  template:
+    metadata:
+      labels:
+        app: postgres-db
+    spec:
+      containers:
+      - name: postgres-db
+        image: postgres:15-alpine
+        env:
+        - name: POSTGRES_USER
+          value: fhir_user
+        - name: POSTGRES_PASSWORD
+          value: fhir_pass
+        - name: POSTGRES_DB
+          value: notification_audit_db
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: postgres-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-db
+spec:
+  selector:
+    app: postgres-db
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+  type: ClusterIP

@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: consent-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: consent-service
+  template:
+    metadata:
+      labels:
+        app: consent-service
+    spec:
+      containers:
+      - name: consent-service
+        image: health-bridge/consent-service:1.0
+        env:
+        - name: EUREKA_SERVER_URL
+          value: "http://discovery-server:9095/eureka/"
+        - name: CONSENT_DB_URL
+          value: "jdbc:postgresql://postgres-db:5432/fhir_main"
+        - name: APP_CORS_ALLOWED_ORIGIN_PATTERNS
+          value: "*"
+        ports:
+        - containerPort: 9094
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: consent-service
+spec:
+  selector:
+    app: consent-service
+  ports:
+    - protocol: TCP
+      port: 9094
+      targetPort: 9094
+  type: ClusterIP

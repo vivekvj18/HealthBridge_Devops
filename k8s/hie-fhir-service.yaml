@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hie-fhir-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hie-fhir-service
+  template:
+    metadata:
+      labels:
+        app: hie-fhir-service
+    spec:
+      containers:
+      - name: hie-fhir-service
+        image: health-bridge/hie-fhir-exchange-service:1.0
+        env:
+        - name: EUREKA_SERVER_URL
+          value: "http://discovery-server:9095/eureka/"
+        - name: HIE_SUPPORT_DB_URL
+          value: "jdbc:postgresql://postgres-db:5432/fhir_main"
+        - name: HOSPITAL_B_MONGO_URI
+          value: "mongodb://mongodb:27017"
+        - name: AUTH_IDENTITY_BASE_URL
+          value: "http://auth-service:9092"
+        - name: CONSENT_SERVICE_BASE_URL
+          value: "http://consent-service:9094"
+        - name: HOSPITAL_A_SERVICE_BASE_URL
+          value: "http://hospital-a-service:9097"
+        - name: HOSPITAL_B_SERVICE_BASE_URL
+          value: "http://hospital-b-service:9098"
+        - name: APP_CORS_ALLOWED_ORIGIN_PATTERNS
+          value: "*"
+        ports:
+        - containerPort: 9096
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hie-fhir-service
+spec:
+  selector:
+    app: hie-fhir-service
+  ports:
+    - protocol: TCP
+      port: 9096
+      targetPort: 9096
+  type: ClusterIP

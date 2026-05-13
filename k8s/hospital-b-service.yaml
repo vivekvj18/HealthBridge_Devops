@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hospital-b-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hospital-b-service
+  template:
+    metadata:
+      labels:
+        app: hospital-b-service
+    spec:
+      containers:
+      - name: hospital-b-service
+        image: health-bridge/hospital-b-service:1.0
+        env:
+        - name: EUREKA_SERVER_URL
+          value: "http://discovery-server:9095/eureka/"
+        - name: HOSPITAL_B_SUPPORT_DB_URL
+          value: "jdbc:postgresql://postgres-db:5432/notification_audit_db"
+        - name: HOSPITAL_B_MONGO_URI
+          value: "mongodb://mongodb:27017"
+        - name: APP_CORS_ALLOWED_ORIGIN_PATTERNS
+          value: "*"
+        ports:
+        - containerPort: 9098
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hospital-b-service
+spec:
+  selector:
+    app: hospital-b-service
+  ports:
+    - protocol: TCP
+      port: 9098
+      targetPort: 9098
+  type: ClusterIP
