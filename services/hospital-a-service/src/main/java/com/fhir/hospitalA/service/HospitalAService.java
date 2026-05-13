@@ -201,7 +201,23 @@ public class HospitalAService {
             notification.setFhirBundleJson(payload);
             notification.setFhirBundleHash(auditService.hashPayload(payload));
             notification.setRead(false);
-            pushNotificationRepository.save(notification);
+            if ("HOSP-B".equals(targetHospital)) {
+                // Call Hospital B to deliver the notification
+                try {
+                    System.out.println(">>> Sending notification to Hospital B for doctor: " + notification.getTargetDoctorUsername());
+                    org.springframework.web.client.RestClient.create("http://hospital-b-service:9098")
+                        .post()
+                        .uri("/hospitalB/notifications/receive")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .body(notification)
+                        .retrieve()
+                        .toBodilessEntity();
+                } catch (Exception e) {
+                    System.err.println("Failed to push to Hospital B: " + e.getMessage());
+                }
+            } else {
+                pushNotificationRepository.save(notification);
+            }
 
             return payload;
         } catch (Exception e) {

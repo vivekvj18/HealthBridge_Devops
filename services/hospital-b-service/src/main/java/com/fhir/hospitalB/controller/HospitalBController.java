@@ -67,4 +67,10 @@ public class HospitalBController {
         String doctorUsername = securityContextHelper.getCurrentUsername();
         return hospitalBService.markNotificationRead(id, doctorUsername);
     }
+
+    @PostMapping("/notifications/receive")
+    public PatientPushNotification receiveNotification(@RequestBody PatientPushNotification notification) {
+        System.out.println(">>> Received notification for doctor: " + notification.getTargetDoctorUsername());
+        return hospitalBService.saveNotification(notification);
+    }
 }

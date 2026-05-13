@@ -96,6 +96,9 @@ public class SecurityConfig {
                 // Patient push must be listed before the wildcard rule.
                 .requestMatchers(HttpMethod.POST, "/hospitalB/op-consult/push")
                     .hasRole("PATIENT")
+                // Internal service-to-service endpoint — no JWT from Hospital A
+                .requestMatchers(HttpMethod.POST, "/hospitalB/notifications/receive")
+                    .permitAll()
                 .requestMatchers(HttpMethod.GET, "/hospitalB/notifications")
                     .hasAnyRole("ADMIN", "DOCTOR")
                 .requestMatchers(HttpMethod.PATCH, "/hospitalB/notifications/**")

@@ -19,9 +19,10 @@ services:
       POSTGRES_PASSWORD: fhir_pass
       POSTGRES_DB: notification_audit_db
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+      - postgres-data:/var/lib/postgresql/data
     networks:
       - health-bridge-network
 
@@ -30,12 +31,15 @@ services:
     image: mongo:6.0
     container_name: hb-mongodb
     ports:
-      - "27017:27017"
+      - "27018:27017"
     networks:
       - health-bridge-network
 
   # 4. API Gateway
   api-gateway:
+    build:
+      context: ./services/api-gateway-service
+      dockerfile: Dockerfile
     image: health-bridge/api-gateway-service:1.0
     container_name: hb-api-gateway
     ports:
@@ -81,6 +85,9 @@ services:
 
   # 7. HIE FHIR Exchange Service
   hie-fhir-service:
+    build:
+      context: ./services/hie-fhir-exchange-service
+      dockerfile: Dockerfile
     image: health-bridge/hie-fhir-exchange-service:1.0
     container_name: hb-hie-fhir-service
     ports:
@@ -93,11 +100,18 @@ services:
       EUREKA_SERVER_URL: "http://discovery-server:9095/eureka/"
       HIE_SUPPORT_DB_URL: "jdbc:postgresql://postgres-db:5432/fhir_main"
       HOSPITAL_B_MONGO_URI: "mongodb://mongodb:27017"
+      AUTH_IDENTITY_BASE_URL: "http://auth-service:9092"
+      CONSENT_SERVICE_BASE_URL: "http://consent-service:9094"
+      HOSPITAL_A_SERVICE_BASE_URL: "http://hospital-a-service:9097"
+      HOSPITAL_B_SERVICE_BASE_URL: "http://hospital-b-service:9098"
     networks:
       - health-bridge-network
 
   # 8. Hospital A Service
   hospital-a-service:
+    build:
+      context: ./services/hospital-a-service
+      dockerfile: Dockerfile
     image: health-bridge/hospital-a-service:1.0
     container_name: hb-hospital-a-service
     ports:
@@ -107,12 +121,15 @@ services:
       - postgres-db
     environment:
       EUREKA_SERVER_URL: "http://discovery-server:9095/eureka/"
-      HOSPITAL_A_DB_URL: "jdbc:postgresql://postgres-db:5432/notification_audit_db"
+      HOSPITAL_A_DB_URL: "jdbc:postgresql://postgres-db:5432/fhir_main"
     networks:
       - health-bridge-network
 
   # 9. Hospital B Service
   hospital-b-service:
+    build:
+      context: ./services/hospital-b-service
+      dockerfile: Dockerfile
     image: health-bridge/hospital-b-service:1.0
     container_name: hb-hospital-b-service
     ports:
@@ -157,7 +174,36 @@ services:
       ADMIN_REPORTING_DB_URL: "jdbc:postgresql://postgres-db:5432/notification_audit_db"
     networks:
       - health-bridge-network
+  # 12. Main Frontend
+  frontend:
+    build: ./frontend
+    container_name: hb-frontend
+    ports:
+      - "5173:5173"
+    networks:
+      - health-bridge-network
+
+  # 13. Hospital A Frontend
+  frontend-hospital-a:
+    build: ./frontend-hospital-a
+    container_name: hb-frontend-hospital-a
+    ports:
+      - "5174:5174"
+    networks:
+      - health-bridge-network
+
+  # 14. Hospital B Frontend
+  frontend-hospital-b:
+    build: ./frontend-hospital-b
+    container_name: hb-frontend-hospital-b
+    ports:
+      - "5175:5175"
+    networks:
+      - health-bridge-network
 
 networks:
   health-bridge-network:
     driver: bridge
+
+volumes:
+  postgres-data:

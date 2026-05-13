@@ -76,6 +76,19 @@ public class DoctorPatientService {
             );
         }
 
+        // Fallback: Fetch from Central Registry (Auth Identity) via REST
+        Map<String, Object> patient = fetchPatientFromAuthIdentity(identifier);
+        if (patient != null && !patient.isEmpty()) {
+            return new DoctorPatientLookupResponseDTO(
+                    null,
+                    identifier,
+                    value(patient, "fullName"),
+                    value(patient, "dateOfBirth"),
+                    value(patient, "gender"),
+                    "GLOBAL"
+            );
+        }
+
         throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Patient not found for identifier: " + identifier);
     }
 

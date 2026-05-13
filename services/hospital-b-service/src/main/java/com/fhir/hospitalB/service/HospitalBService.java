@@ -334,4 +334,9 @@ public class HospitalBService {
         notification.setReadAt(java.time.Instant.now());
         return pushNotificationRepository.save(notification);
     }
+
+    @Transactional
+    public PatientPushNotification saveNotification(PatientPushNotification notification) {
+        return pushNotificationRepository.save(notification);
+    }
 }
