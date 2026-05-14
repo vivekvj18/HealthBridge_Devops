@@ -16,6 +16,7 @@ pipeline {
         stage('Run Tests') {
             steps {
                 sh 'mvn test'
+                junit '**/target/surefire-reports/*.xml'
             }
         }
         stage('Build Docker Images & Deploy to K8s (Selective)') {
