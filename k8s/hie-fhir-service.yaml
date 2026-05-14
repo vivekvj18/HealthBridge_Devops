@@ -32,6 +32,13 @@ spec:
           value: "http://hospital-b-service:9098"
         - name: APP_CORS_ALLOWED_ORIGIN_PATTERNS
           value: "*"
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "512Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1024Mi"
         ports:
         - containerPort: 9096
 ---

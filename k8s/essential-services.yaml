@@ -19,6 +19,13 @@ spec:
         env:
         - name: EUREKA_SERVER_URL
           value: "http://discovery-server:9095/eureka/"
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
         ports:
         - containerPort: 9091
 ---
