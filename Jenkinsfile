@@ -52,12 +52,18 @@ pipeline {
                             // We build as :1.0 to match the K8s YAML files
                             // eval $(minikube docker-env) ensures images are built inside Minikube
                             sh """
-                                eval \$(minikube docker-env)
                                 cd services/${service}
+                                
+                                # 1. Build and Push to Docker Hub (for Rubrics Requirement)
+                                docker build -t 2001vivekjoshi/${service}:latest .
+                                docker push 2001vivekjoshi/${service}:latest
+                                
+                                # 2. Build directly into Minikube for ultra-fast local deployment
+                                eval \$(minikube docker-env)
                                 docker build -t health-bridge/${service}:1.0 .
                             """
                             
-                            // Because image tag is still 1.0, we force K8s to pull/use the new image by restarting the deployment
+                            // Because image tag is still 1.0 locally, we force K8s to pull/use the new image by restarting the deployment
                             // Note: Deployment names in K8s are mostly identical to service folder names, except api-gateway which is just api-gateway sometimes.
                             // Let's use labels or approximate names. Usually it's the folder name without "-service" or just the folder name.
                             def deploymentName = service.replace("-service", "")
