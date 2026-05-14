@@ -10,7 +10,12 @@ pipeline {
         }
         stage('Build Project') {
             steps {
-                sh 'mvn clean install'
+                sh 'mvn clean install -DskipTests'
+            }
+        }
+        stage('Run Tests') {
+            steps {
+                sh 'mvn test'
             }
         }
         stage('Build Docker Images & Deploy to K8s (Selective)') {
