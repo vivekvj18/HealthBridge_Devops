@@ -78,3 +78,4 @@ We are currently in **Milestone 2: Orchestrating Locally**.
    docker compose up -d
    ```
 3. Verify Eureka Dashboard at `http://localhost:9095`.
+ 
