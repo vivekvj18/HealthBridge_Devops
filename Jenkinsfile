@@ -63,12 +63,10 @@ pipeline {
                                 docker build -t health-bridge/${service}:1.0 .
                             """
                             
-                            // Because image tag is still 1.0 locally, we force K8s to pull/use the new image by restarting the deployment
-                            // Note: Deployment names in K8s are mostly identical to service folder names, except api-gateway which is just api-gateway sometimes.
-                            // Let's use labels or approximate names. Usually it's the folder name without "-service" or just the folder name.
                             def deploymentName = service.replace("-service", "")
                             if (service == 'api-gateway-service') deploymentName = 'api-gateway'
                             if (service == 'hie-fhir-exchange-service') deploymentName = 'hie-fhir-service'
+                            if (service == 'auth-identity-service') deploymentName = 'auth-service'
                             
                             sh "kubectl rollout restart deployment ${deploymentName} || true"
                         } else {
