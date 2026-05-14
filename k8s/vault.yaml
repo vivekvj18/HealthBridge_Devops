@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault
+  labels:
+    app: vault
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vault
+  template:
+    metadata:
+      labels:
+        app: vault
+    spec:
+      containers:
+      - name: vault
+        image: hashicorp/vault:1.13.0
+        env:
+        - name: VAULT_DEV_ROOT_TOKEN_ID
+          value: "root"
+        - name: VAULT_DEV_LISTEN_ADDRESS
+          value: "0.0.0.0:8200"
+        ports:
+        - containerPort: 8200
+        lifecycle:
+          postStart:
+            exec:
+              # Automatically store ALL project secrets in Vault when it starts
+              command: ["/bin/sh", "-c", "sleep 5 && vault kv put secret/auth-db password=postgres && vault kv put secret/jwt-token key=HealthBridgeSuperSecretKey2026 && vault kv put secret/mongodb password=MongoRootPass123 || true"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault
+spec:
+  selector:
+    app: vault
+  ports:
+    - protocol: TCP
+      port: 8200
+      targetPort: 8200
