@@ -1,4 +1,4 @@
-# Health-Bridge: Microservices DevOpsification Project.
+# Health-Bridge: Microservices DevOpsification Project..
 
 This project demonstrates the transition of the Health-Bridge healthcare system from a monolithic architecture to a distributed microservices architecture, fully automated with a production-grade DevOps pipeline.
 
