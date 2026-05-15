@@ -46,36 +46,7 @@ spec:
   ports:
   - port: 9200
     targetPort: 9200
----
-# Logstash (Lightweight Configuration)
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: logstash
-  namespace: logging
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: logstash
-  template:
-    metadata:
-      labels:
-        app: logstash
-    spec:
-      containers:
-      - name: logstash
-        image: docker.elastic.co/logstash/logstash:7.17.10
-        env:
-        - name: LS_JAVA_OPTS
-          value: "-Xms256m -Xmx256m"
-        resources:
-          requests:
-            memory: "256Mi"
-          limits:
-            memory: "512Mi"
-        ports:
-        - containerPort: 5044
+
 ---
 # Kibana Dashboard
 apiVersion: apps/v1

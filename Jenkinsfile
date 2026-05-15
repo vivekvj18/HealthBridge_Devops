@@ -51,8 +51,7 @@ pipeline {
                     
                     // 3. Build changed services directly in Minikube and restart their deployments
                     for (service in services) {
-                        // FORCE ALL SERVICES TO BUILD FOR DOCKER HUB SCREENSHOT
-                        def serviceChanged = true 
+                        def serviceChanged = changedFiles.any { it.startsWith("services/${service}/") }
                         
                         if (serviceChanged) {
                             echo ">>> Service ${service} has changes. Building image and deploying..."
