@@ -25,7 +25,7 @@ spec:
           value: "root"
         command: ["/bin/sh", "-c"]
         # Fetch the password from Vault and write it to the shared volume
-        args: ["sleep 10 && vault kv get -field=password secret/auth-db > /vault/secrets/db-password.txt"]
+        args: ["sleep 5 && until vault kv get -field=password secret/auth-db > /vault/secrets/db-password.txt 2>/dev/stderr; do echo waiting for Vault secret; sleep 2; done"]
         volumeMounts:
         - name: vault-secrets
           mountPath: /vault/secrets

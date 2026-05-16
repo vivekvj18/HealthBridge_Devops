@@ -17,18 +17,46 @@ spec:
       containers:
       - name: vault
         image: hashicorp/vault:1.13.0
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          vault server -dev &
+          VAULT_PID=$!
+          for i in $(seq 1 60); do
+            if VAULT_ADDR=http://127.0.0.1:8200 vault status >/dev/null 2>&1; then
+              echo 'Vault ready, seeding secrets'
+              VAULT_ADDR=http://127.0.0.1:8200 vault kv put secret/auth-db password=fhir_pass
+              VAULT_ADDR=http://127.0.0.1:8200 vault kv put secret/jwt-token key=HealthBridgeSuperSecretKey2026
+              VAULT_ADDR=http://127.0.0.1:8200 vault kv put secret/mongodb password=MongoRootPass123
+              break
+            fi
+            echo 'waiting for Vault to start'
+            sleep 2
+          done
+          wait "$VAULT_PID"
         env:
         - name: VAULT_DEV_ROOT_TOKEN_ID
           value: "root"
         - name: VAULT_DEV_LISTEN_ADDRESS
           value: "0.0.0.0:8200"
+        - name: VAULT_ADDR
+          value: "http://127.0.0.1:8200"
+        - name: VAULT_API_ADDR
+          value: "http://127.0.0.1:8200"
         ports:
         - containerPort: 8200
-        lifecycle:
-          postStart:
-            exec:
-              # Automatically store ALL project secrets in Vault when it starts
-              command: ["/bin/sh", "-c", "sleep 5 && vault kv put secret/auth-db password=postgres && vault kv put secret/jwt-token key=HealthBridgeSuperSecretKey2026 && vault kv put secret/mongodb password=MongoRootPass123 || true"]
+        readinessProbe:
+          exec:
+            command: ["/bin/sh", "-c", "VAULT_ADDR=http://127.0.0.1:8200 vault status >/dev/null 2>&1"]
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 6
+        livenessProbe:
+          exec:
+            command: ["/bin/sh", "-c", "VAULT_ADDR=http://127.0.0.1:8200 vault status >/dev/null 2>&1"]
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          failureThreshold: 3
 ---
 apiVersion: v1
 kind: Service

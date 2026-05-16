@@ -44,6 +44,7 @@ spec:
       containers:
       - name: postgres-db
         image: postgres:15-alpine
+        args: ["-c", "max_connections=200"]
         env:
         - name: POSTGRES_USER
           value: fhir_user
